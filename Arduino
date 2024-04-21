@@ -1,0 +1,117 @@
+#include <ESP32Servo.h>    // Include the servo library
+#include <Wire.h>          // Include the Wire library
+#include <LiquidCrystal_I2C.h> // Include the LiquidCrystal_I2C library
+
+#define I2C_ADDRESS 0x27   // I2C address of the LCD module
+#define LCD_COLUMNS 16     // Number of columns in the LCD
+#define LCD_ROWS 2         // Number of rows in the LCD
+
+LiquidCrystal_I2C lcd(I2C_ADDRESS, LCD_COLUMNS, LCD_ROWS); // Create a new LiquidCrystal_I2C object
+
+Servo myservo;
+
+#define ir_car1 33
+#define ir_car2 25
+#define ir_car3 26
+#define ir_car4 27
+
+#define ultrasonicTrigPin 5   // Ultrasonic sensor trigger pin
+#define ultrasonicEchoPin 18  // Ultrasonic sensor echo pin
+
+int S1 = 0, S2 = 0, S3 = 0, S4 = 0;
+int slot = 4; // Initialize with total parking slots
+
+void setup() {
+  Serial.begin(9600);
+  delay(1500);
+
+  Wire.begin(21, 22);
+
+  lcd.init();
+  lcd.backlight();
+
+  pinMode(ir_car1, INPUT);
+  pinMode(ir_car2, INPUT);
+  pinMode(ir_car3, INPUT);
+  pinMode(ir_car4, INPUT);
+
+  pinMode(ultrasonicTrigPin, OUTPUT);
+  pinMode(ultrasonicEchoPin, INPUT);
+
+  myservo.attach(13);
+  myservo.write(90);
+
+  lcd.begin(20, 4);
+  lcd.setCursor(0, 1);
+  lcd.print("    Car  parking  ");
+  lcd.setCursor(0, 2);
+  lcd.print("    System     ");
+  delay(2000);
+  lcd.clear();
+}
+
+void loop() {
+  Read_Sensor();
+  Update_Slot_Count();
+  Check_Ultrasonic();
+
+  lcd.setCursor(0, 0);
+  lcd.print("   Have Slot: ");
+  lcd.print(slot);
+  lcd.print("    ");
+
+  lcd.setCursor(0, 1);
+  lcd.print("A:");
+  lcd.print(S1);
+  lcd.print(" B: ");
+  lcd.print(S2);
+
+  lcd.setCursor(0, 2);
+  lcd.print("C: ");
+  lcd.print(S3);
+  lcd.print(" D: ");
+  lcd.print(S4);
+
+  if (S1 && S2 && S3 && S4) {
+    lcd.setCursor(0, 2);
+    lcd.print("Parking is Full");
+  } else {
+    lcd.setCursor(0, 2);
+    lcd.print("Parking Empty");
+  }
+
+  delay(1000);
+}
+
+void Read_Sensor() {
+  S1 =! digitalRead(ir_car1);
+  S2 = !digitalRead(ir_car2);
+  S3 =! digitalRead(ir_car3);
+  S4 = !digitalRead(ir_car4);
+}
+
+void Update_Slot_Count() {
+  int total = S1 + S2 + S3 + S4;
+  slot = 4 - total; // Update available slots
+}
+
+void Check_Ultrasonic() {
+  digitalWrite(ultrasonicTrigPin, LOW);
+  delayMicroseconds(2);
+  digitalWrite(ultrasonicTrigPin, HIGH);
+  delayMicroseconds(10);
+  digitalWrite(ultrasonicTrigPin, LOW);
+
+  long duration = pulseIn(ultrasonicEchoPin, HIGH);
+  int distance = duration * 0.034 / 2;
+
+  if (distance < 5) { // Adjust threshold as needed
+    Open_Gate();
+  }
+}
+
+void Open_Gate() {
+  myservo.write(180); // Open the gate
+  delay(2000);        // Keep the gate open for 2 seconds
+  myservo.write(90);  // Close the gate
+}
